@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -8,20 +8,18 @@ const inter = Inter({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Enterplay Solutions · Panel de Control",
   description: "Panel de control de Enterplay Solutions.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="es">
       <body className={`${inter.variable} antialiased font-sans`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

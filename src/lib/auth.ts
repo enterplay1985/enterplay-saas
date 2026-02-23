@@ -1,104 +1,56 @@
-import NextAuth, { type NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import type { FieldSet } from "airtable";
-import { airtableBase, type AirtableUserFields } from "@/lib/airtable";
-
-type UserRecordFields = AirtableUserFields & FieldSet;
-
-const USERS_TABLE_NAME = "Users";
-
-async function findUserByCredentials(email: string, password: string) {
-  const table = airtableBase<UserRecordFields>(USERS_TABLE_NAME);
-
-  const records = await table
-    .select({
-      maxRecords: 1,
-      filterByFormula: `AND({Email} = '${email}', {AppPassword} = '${password}')`,
-    })
-    .all();
-
-  const record = records[0];
-  if (!record) return null;
-
-  const fields = record.fields;
-
-  return {
-    id: record.id,
-    name: (fields.Name ?? "").toString(),
-    email: (fields.Email ?? "").toString(),
-    clientId: (fields.ClientID ?? "").toString(),
-    role: (fields.Role ?? "owner").toString(),
-    businessName: (fields.BusinessName ?? "").toString(),
-    credits: Number(fields.Credits ?? 0),
-  };
-}
+import GoogleProvider from "next-auth/providers/google";
+import { NextAuthOptions } from "next-auth";
+import { getAirtableUserByEmail, createAirtableUser } from "@/lib/airtable"; 
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    CredentialsProvider({
-      id: "credentials",
-      name: "Credenciales",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Contraseña", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        const user = await findUserByCredentials(
-          credentials.email,
-          credentials.password
-        );
-
-        if (!user) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          clientId: user.clientId,
-          role: user.role,
-          businessName: user.businessName,
-          credits: user.credits,
-        };
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: "openid email profile https://www.googleapis.com/auth/business.manage",
+          prompt: "consent",
+          access_type: "offline",
+        },
       },
     }),
-    // Futuro: aquí se puede añadir un proveedor de Google
-    // GoogleProvider({...})
   ],
-  session: {
-    strategy: "jwt",
-  },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.clientId = (user as any).clientId;
-        token.role = (user as any).role;
-        token.businessName = (user as any).businessName;
-        token.credits = (user as any).credits;
+    async jwt({ token, user, account }) {
+      if (account && user) {
+        token.accessToken = account.access_token;
+        
+        // Buscamos o creamos el usuario en Airtable
+        let dbUser = await getAirtableUserByEmail(user.email!);
+
+        if (!dbUser) {
+          dbUser = await createAirtableUser({
+            email: user.email!,
+            name: user.name || "Usuario Google"
+          });
+        }
+
+        // Inyectamos los datos reales de Airtable al token
+        if (dbUser) {
+          token.clientId = dbUser.clientId;
+          token.credits = dbUser.credits;
+          token.recordId = dbUser.id;
+        }
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
-        (session.user as any).clientId = token.clientId;
-        (session.user as any).role = token.role;
-        (session.user as any).businessName = token.businessName;
-        (session.user as any).credits = token.credits;
+        session.user.clientId = token.clientId;
+        session.user.credits = token.credits;
+        session.accessToken = token.accessToken;
       }
       return session;
     },
   },
+  secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: "/login",
-  },
+    signIn: '/login',
+  }
 };
-
-const authHandler = NextAuth(authOptions);
-
-export { authHandler };
-

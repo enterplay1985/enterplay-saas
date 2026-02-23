@@ -9,9 +9,7 @@ type Status = "idle" | "loading" | "loaded" | "error";
 function getInitials(nombre: string): string {
   if (!nombre) return "EP";
   const parts = nombre.trim().split(" ");
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
@@ -36,115 +34,103 @@ export function ReviewsList({ clientId }: ReviewsListProps) {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!clientId) {
-      return;
-    }
-
-    setStatus("loading");
-    startTransition(async () => {
+    if (!clientId) return;
+    async function fetchReviews() {
+      setStatus("loading");
       try {
         const data = await getReviews(clientId);
         setReviews(data);
         setStatus("loaded");
       } catch (error) {
-        console.error("[Enterplay] Error al cargar reseñas", error);
+        console.error("Error fetching reviews:", error);
         setStatus("error");
       }
-    });
+    }
+    fetchReviews();
   }, [clientId]);
 
-  const showSkeleton = status === "loading" || isPending;
+  // Lógica de Métricas (Opción B: Filtrado dinámico)
+  const total = reviews.length;
+  const contestadas = reviews.filter(
+    (r) => r.estado === "Contestada" || r.respondida === true
+  ).length;
+  const pendientes = total - contestadas;
 
-  if (showSkeleton) {
-    return (
-      <div className="divide-y divide-slate-100">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex animate-pulse gap-3 py-3.5 first:pt-0 last:pb-0"
-          >
-            <div className="mt-0.5 h-9 w-9 rounded-2xl bg-slate-100" />
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="h-3 w-32 rounded-full bg-slate-100" />
-                <div className="h-3 w-10 rounded-full bg-slate-100" />
-              </div>
-              <div className="h-3 w-40 rounded-full bg-slate-100" />
-              <div className="h-3 w-full rounded-full bg-slate-100" />
-              <div className="h-2 w-20 rounded-full bg-slate-100" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <p className="text-xs text-slate-500">
-        No se han podido cargar las reseñas. Inténtalo de nuevo en unos
-        minutos.
-      </p>
-    );
-  }
-
-  if (reviews.length === 0) {
-    return (
-      <p className="text-xs text-slate-500">
-        Aún no hay reseñas registradas en tu cuenta.
-      </p>
-    );
+  if (status === "loading") {
+    return <div className="animate-pulse text-sm text-slate-400">Cargando datos de Airtable...</div>;
   }
 
   return (
-    <div className="divide-y divide-slate-100">
-      {reviews.map((review, index) => (
-        <article
-          key={review.id}
-          className="flex gap-3 py-3.5 first:pt-0 last:pb-0"
-        >
-          <div
-            className={`mt-0.5 flex h-9 w-9 items-center justify-center overflow-hidden rounded-2xl text-[11px] font-semibold tracking-tight ${getColor(
-              index
-            )}`}
-          >
-            {review.avatar ? (
-              // Avatar URL de Airtable (si está presente)
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={review.avatar}
-                alt={review.nombre}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              getInitials(review.nombre)
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold tracking-tight text-slate-900">
-                  {review.nombre}
-                </p>
-                <p className="truncate text-[11px] text-slate-500">
-                  {review.negocio}
-                </p>
+    <div className="space-y-6">
+      {/* --- BLOQUE DE MÉTRICAS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-6 rounded-[28px] border border-slate-200 shadow-sm">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Reseñas</p>
+          <p className="mt-1 text-4xl font-bold tracking-tighter text-slate-900">{total}</p>
+          <div className="mt-2 h-1 w-8 rounded-full bg-slate-100" />
+        </div>
+
+        <div className="bg-white p-6 rounded-[28px] border border-slate-200 shadow-sm">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Contestadas</p>
+          <p className="mt-1 text-4xl font-bold tracking-tighter text-[#34C759]">{contestadas}</p>
+          <div className="mt-2 h-1 w-8 rounded-full bg-[#34C759]/20" />
+        </div>
+
+        <div className="bg-white p-6 rounded-[28px] border border-slate-200 shadow-sm">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pendientes</p>
+          <p className="mt-1 text-4xl font-bold tracking-tighter text-[#FF9500]">{pendientes}</p>
+          <div className="mt-2 h-1 w-8 rounded-full bg-[#FF9500]/20" />
+        </div>
+      </div>
+
+      {/* --- LISTA DE RESEÑAS --- */}
+      <div className="bg-white rounded-[28px] border border-slate-200 p-6 shadow-sm">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Actividad Reciente</h2>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-500 uppercase">
+            ID: {clientId}
+          </span>
+        </div>
+
+        <div className="space-y-4">
+          {reviews.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-400">No hay reseñas para este cliente.</p>
+          ) : (
+            reviews.map((review, index) => (
+              <div
+                key={review.id}
+                className="flex items-start gap-4 rounded-2xl border border-transparent p-3 transition-colors hover:border-slate-100 hover:bg-slate-50/50"
+              >
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${getColor(index)}`}>
+                  {review.avatar ? (
+                    <img src={review.avatar} alt={review.nombre} className="h-full w-full rounded-xl object-cover" />
+                  ) : (
+                    getInitials(review.nombre)
+                  )}
+                </div>
+                
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{review.nombre}</p>
+                      <p className="text-[10px] text-slate-500">{review.negocio}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-0.5 text-amber-400">
+                        <span className="text-xs font-bold text-slate-900 mr-1">{review.estrellas}</span>
+                        {"★".repeat(Math.floor(review.estrellas))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-600">
+                    {review.comentario}
+                  </p>
+                </div>
               </div>
-              <div className="flex flex-col items-end">
-                <span className="text-xs font-semibold tracking-tight text-slate-900">
-                  {review.estrellas.toFixed(1)}
-                </span>
-                <span className="text-[9px] text-amber-400">★★★★★</span>
-              </div>
-            </div>
-            <p className="mt-2 line-clamp-2 text-[11px] leading-relaxed text-slate-600">
-              {review.comentario}
-            </p>
-            <p className="mt-1 text-[10px] text-slate-400">{review.fecha}</p>
-          </div>
-        </article>
-      ))}
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
-
