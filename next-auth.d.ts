@@ -1,33 +1,23 @@
-import "next-auth";
-import "next-auth/jwt";
+import NextAuth, { DefaultSession } from "next-auth";
+import { JWT } from "next-auth/jwt";
 
 declare module "next-auth" {
-  interface User {
-    clientId?: string;
-    role?: string;
-    businessName?: string;
-    credits?: number;
-  }
-
+  /**
+   * Extendemos la sesión para incluir el accessToken de Google
+   */
   interface Session {
+    accessToken?: string;
     user: {
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-      clientId?: string;
-      role?: string;
-      businessName?: string;
-       credits?: number;
-    };
+      id?: string;
+    } & DefaultSession["user"];
   }
 }
 
 declare module "next-auth/jwt" {
+  /**
+   * Extendemos el JWT para que guarde el token temporalmente
+   */
   interface JWT {
-    clientId?: string;
-    role?: string;
-    businessName?: string;
-     credits?: number;
+    accessToken?: string;
   }
 }
-

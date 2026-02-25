@@ -1,0 +1,68 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sync-google-business",
+        "options": {}
+      },
+      "id": "webhook-nextjs",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://mybusinessbusinessinformation.googleapis.com/v1/accounts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-google-accounts",
+      "name": "Get Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [470, 300],
+      "notesInFlow": true,
+      "notes": "Obtiene el accountName de Google"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://mybusinessbusinessinformation.googleapis.com/v1/' + $json.accounts[0].name + '/locations?readMask=name,title' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-locations",
+      "name": "Get Locations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "application": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "Negocios",
+        "options": {}
+      },
+      "id": "save-to-airtable",
+      "name": "Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [910, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Get Accounts", "type": "main", "index": 0 }]]
+    },
+    "Get Accounts": {
+      "main": [[{ "node": "Get Locations", "type": "main", "index": 0 }]]
+    },
+    "Get Locations": {
+      "main": [[{ "node": "Airtable", "type": "main", "index": 0 }]]
+    }
+  }
+}

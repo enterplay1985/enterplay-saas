@@ -1,6 +1,6 @@
-import GoogleProvider from "next-auth/providers/google";
+// lib/auth.ts
 import { NextAuthOptions } from "next-auth";
-import { getAirtableUserByEmail, createAirtableUser } from "@/lib/airtable"; 
+import GoogleProvider from "next-auth/providers/google";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -10,47 +10,23 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           scope: "openid email profile https://www.googleapis.com/auth/business.manage",
-          prompt: "consent",
           access_type: "offline",
+          prompt: "consent",
         },
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
-      if (account && user) {
+    async jwt({ token, account }) {
+      if (account) {
         token.accessToken = account.access_token;
-        
-        // Buscamos o creamos el usuario en Airtable
-        let dbUser = await getAirtableUserByEmail(user.email!);
-
-        if (!dbUser) {
-          dbUser = await createAirtableUser({
-            email: user.email!,
-            name: user.name || "Usuario Google"
-          });
-        }
-
-        // Inyectamos los datos reales de Airtable al token
-        if (dbUser) {
-          token.clientId = dbUser.clientId;
-          token.credits = dbUser.credits;
-          token.recordId = dbUser.id;
-        }
       }
       return token;
     },
-    async session({ session, token }: any) {
-      if (session.user) {
-        session.user.clientId = token.clientId;
-        session.user.credits = token.credits;
-        session.accessToken = token.accessToken;
-      }
+    async session({ session, token }) {
+      session.accessToken = token.accessToken;
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  pages: {
-    signIn: '/login',
-  }
+  secret: process.env.NEXTAUTH_SECRET, // ¡No olvides esta variable en tu .env!
 };
